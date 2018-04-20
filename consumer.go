@@ -27,6 +27,10 @@ type MessageEvent struct {
 	Value []byte
 }
 
+func (me MessageEvent) PartitionString() string {
+	return me.Topic + "_" + strconv.FormatInt(me.PartitionId, 10)
+}
+
 type Consumer interface {
 	PartitionEvent() <-chan PartitionEvent
 	MessageEvent() <-chan MessageEvent

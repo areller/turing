@@ -33,6 +33,25 @@ func (pm *PartitionManager) handlePartitionEvent(ev PartitionEvent) {
 	}
 }
 
+func (pm *PartitionManager) handleMessageEvent(ev MessageEvent) {
+	codec, ok := pm.codecs[ev.Topic]
+	if !ok {
+		return
+	}
+
+	decoded, err := codec.Decode(ev.Key, ev.Value)
+	if err != nil {
+		return
+	}
+
+	part, ok := pm.partitions[ev.PartitionString()]
+	if !ok {
+		return
+	}
+
+	part.Messages <- decoded
+}
+
 func (pm *PartitionManager) Close() {
 	close(pm.close)
 }
@@ -48,6 +67,8 @@ func (pm *PartitionManager) Run() {
 			return
 		case ev := <- pm.consumer.PartitionEvent():
 			pm.handlePartitionEvent(ev)
+		case ev := <- pm.consumer.MessageEvent():
+			pm.handleMessageEvent(ev)
 		}
 	}
 }
@@ -59,6 +80,6 @@ func NewPartitionManager(consumer Consumer) *PartitionManager {
 		partitions: make(map[string]*Partition),
 		CreatedPartition: make(chan *Partition),
 		RemovedPartition: make(chan *Partition),
-		Errors: make(chan error),
+		Errors: make(chan error, 10),
 	}
 }

@@ -1,6 +1,7 @@
 package turing
 
 import (
+	"time"
 	"testing"
 	"github.com/stretchr/testify/assert"
 )
@@ -126,5 +127,47 @@ func TestShouldNotCreateWithoutCodec(t *testing.T) {
 		})
 	case <- pm.Errors:
 		t.Error("Should not throw an error")
+	}
+}
+
+func TestCodecShouldDecode(t *testing.T) {
+	con := NewConsumerMock()
+	codec := new(StringCodec)
+	pm := NewPartitionManager(con)
+	pm.SetCodec("myTopic", codec)
+
+	go pm.Run()
+
+	con.CreatePartitionEvent(PartitionEvent{
+		Type: PartitionCreated,
+		Topic: "myTopic",
+		Id: 0,
+	})
+
+	done := make(chan struct{})
+	part := <- pm.CreatedPartition
+	part.SetHandler(func (p *Partition, message DecodedKV) {
+		assert.Equal(t, part, p)
+		assert.Equal(t, "key_1", message.Key)
+		assert.Equal(t, "My Message", message.Value)
+		close(done)
+	})
+
+	go part.Run()
+
+	msgEncoded, _ := codec.Encode("key_1", "My Message")
+	con.CreateMessageEvent(MessageEvent{
+		Topic: "myTopic",
+		PartitionId: 0,
+		Offset: 0,
+		Key: msgEncoded.Key,
+		Value: msgEncoded.Value,
+	})
+
+	select {
+	case <- done:
+		;
+	case <- time.After(time.Second):
+		t.Error("Message has not arrived to handler")
 	}
 }
