@@ -1,10 +1,30 @@
 package turing
 
+type partitionRunner struct {
+	manager *PartitionManager
+	partition *Partition
+	closeChan chan struct{}
+}
+
+func (runner *partitionRunner) close() {
+	close(runner.closeChan)
+}
+
+func (runner *partitionRunner) run() {
+	for {
+		select {
+		case <- runner.closeChan:
+			return
+		case off := <- runner.partition.offsetChan:
+			runner.manager.consumer.Assign(runner.partition.Topic, runner.partition.Id, off)
+		}
+	}
+}
+
 type PartitionManager struct {
-	close chan struct{}
+	closeChan chan struct{}
 	consumer Consumer
-	codecs map[string]Codec
-	partitions map[string]*Partition
+	partitions map[string]*partitionRunner
 
 	CreatedPartition chan *Partition
 	RemovedPartition chan *Partition
@@ -14,56 +34,44 @@ type PartitionManager struct {
 func (pm *PartitionManager) handlePartitionEvent(ev PartitionEvent) {
 	switch ev.Type {
 	case PartitionCreated:
-		_, ok := pm.codecs[ev.Topic]
-		if ok {
-			part := NewPartition(ev.Topic, ev.Id)
-			pm.partitions[ev.String()] = part
-			pm.CreatedPartition <- part
-		} else {
-			pm.Errors <- NoCodecForTopic
+		part := NewPartition(ev.Topic, ev.Id)
+		id := ev.String()
+		pm.partitions[id] = &partitionRunner{
+			manager: pm,
+			partition: part,
+			closeChan: make(chan struct{}),
 		}
+		go pm.partitions[id].run()
+		pm.CreatedPartition <- part
 	case PartitionDestroyed:
 		part, ok := pm.partitions[ev.String()]
 		if ok {
 			delete(pm.partitions, ev.String())
-			pm.RemovedPartition <- part
+			part.close()
+			pm.RemovedPartition <- part.partition
 		} else {
-			pm.Errors <- NoPartition
+			pm.Errors <- NoPartitionError
 		}
 	}
 }
 
 func (pm *PartitionManager) handleMessageEvent(ev MessageEvent) {
-	codec, ok := pm.codecs[ev.Topic]
-	if !ok {
-		return
-	}
-
-	decoded, err := codec.Decode(ev.Key, ev.Value)
-	if err != nil {
-		return
-	}
-
 	part, ok := pm.partitions[ev.PartitionString()]
 	if !ok {
 		return
 	}
 
-	part.Messages <- decoded
+	part.partition.Messages <- ev
 }
 
 func (pm *PartitionManager) Close() {
-	close(pm.close)
-}
-
-func (pm *PartitionManager) SetCodec(topic string, codec Codec) {
-	pm.codecs[topic] = codec
+	close(pm.closeChan)
 }
 
 func (pm *PartitionManager) Run() {
 	for {
 		select {
-		case <- pm.close:
+		case <- pm.closeChan:
 			return
 		case ev := <- pm.consumer.PartitionEvent():
 			pm.handlePartitionEvent(ev)
@@ -75,9 +83,9 @@ func (pm *PartitionManager) Run() {
 
 func NewPartitionManager(consumer Consumer) *PartitionManager {
 	return &PartitionManager{
+		closeChan: make(chan struct{}),
 		consumer: consumer,
-		codecs: make(map[string]Codec),
-		partitions: make(map[string]*Partition),
+		partitions: make(map[string]*partitionRunner),
 		CreatedPartition: make(chan *Partition),
 		RemovedPartition: make(chan *Partition),
 		Errors: make(chan error, 10),

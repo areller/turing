@@ -7,6 +7,7 @@ import (
 const (
 	PartitionCreated = iota
 	PartitionDestroyed = iota
+	PartitionEnd = iota
 )
 
 type PartitionEvent struct {
@@ -34,6 +35,6 @@ func (me MessageEvent) PartitionString() string {
 type Consumer interface {
 	PartitionEvent() <-chan PartitionEvent
 	MessageEvent() <-chan MessageEvent
-	Subscribe(topics []string)
 	Commit(topic string, partition int64, offset int64)
+	Assign(topic string, partition int64, offset int64)
 }

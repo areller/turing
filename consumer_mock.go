@@ -26,6 +26,10 @@ func (cm *ConsumerMock) Commit(topic string, partition int64, offset int64) {
 
 }
 
+func (cm *ConsumerMock) Assign(topic string, partition int64, offset int64) {
+
+}
+
 func (cm *ConsumerMock) CreatePartitionEvent(pe PartitionEvent) {
 	cm.partitionEvent <- pe
 }
