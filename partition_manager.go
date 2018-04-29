@@ -68,11 +68,11 @@ func (pm *PartitionManager) Close() {
 	close(pm.closeChan)
 }
 
-func (pm *PartitionManager) Run() {
+func (pm *PartitionManager) Run() error {
 	for {
 		select {
 		case <- pm.closeChan:
-			return
+			return nil
 		case ev := <- pm.consumer.PartitionEvent():
 			pm.handlePartitionEvent(ev)
 		case ev := <- pm.consumer.MessageEvent():

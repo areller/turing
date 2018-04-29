@@ -37,4 +37,5 @@ type Consumer interface {
 	MessageEvent() <-chan MessageEvent
 	Commit(topic string, partition int64, offset int64)
 	Assign(topic string, partition int64, offset int64)
+	Subscribe(topics []string)
 }

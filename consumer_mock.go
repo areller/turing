@@ -19,7 +19,7 @@ func (cm *ConsumerMock) MessageEvent() <-chan MessageEvent {
 }
 
 func (cm *ConsumerMock) Subscribe(topics []string) {
-
+	
 }
 
 func (cm *ConsumerMock) Commit(topic string, partition int64, offset int64) {

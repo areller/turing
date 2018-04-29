@@ -92,3 +92,9 @@ func NewPartition(topic string, partitionId int64) *Partition {
 		Messages: make(chan MessageEvent),
 	}
 }
+
+func DefaultCommitBehavior() PartitionCommitHandler {
+	return func (partition *Partition, message MessageEvent) {
+
+	}
+}
