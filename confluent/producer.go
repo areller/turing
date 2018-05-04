@@ -4,11 +4,18 @@ import (
 	"sync/atomic"
 	"sync"
 	"strings"
+	"github.com/areller/turing"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
 type ProducerConfig struct {
 	Brokers []string
+}
+
+func ProducerConfigFromTable(table turing.ConfigTable) ProducerConfig {
+	return ProducerConfig{
+		Brokers: strings.Split(table.GetString("kafka_brokers"), ","),
+	}
 }
 
 type Producer struct {

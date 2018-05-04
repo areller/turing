@@ -19,6 +19,15 @@ type ConsumerConfig struct {
 	AutoCommitInterval int
 }
 
+func ConsumerConfigFromTable(table turing.ConfigTable) ConsumerConfig {
+	return ConsumerConfig{
+		Brokers: strings.Split(table.GetString("kafka_brokers"), ","),
+		Group: table.GetString("kafka_group"),
+		AutoCommit: table.GetBool("kafka_auto_commit"),
+		AutoCommitInterval: table.GetInt("kafka_auto_commit_interval"),
+	}
+}
+
 type Consumer struct {
 	cconsumer *kafka.Consumer
 	topicsMap map[string]*string
