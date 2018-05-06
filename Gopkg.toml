@@ -36,3 +36,11 @@
 [[constraint]]
   name = "github.com/confluentinc/confluent-kafka-go"
   version = "0.11.4"
+
+[[constraint]]
+  name = "github.com/golang/protobuf"
+  version = "master"
+
+[[constraint]]
+  name = "github.com/go-redis/redis"
+  version = "master"

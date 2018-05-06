@@ -1,16 +1,29 @@
 package turing
 
-type SimpleProcessorHandler func (msg DecodedKV)
+type SimpleProcessorContext struct {
+	Processor *SimpleProcessor
+	Topic string
+	TopicObject interface{}
+	ProcessorObject interface{}
+}
+
+type SimpleProcessorHandler func (context SimpleProcessorContext, msg DecodedKV)
 
 type SimpleProcessorTopicDefinition struct {
 	Name string
 	Codec Codec
 	Handler SimpleProcessorHandler
+	Object interface{}
 }
 
-func (sptd SimpleProcessorTopicDefinition) transformHandler() PartitionHandler {
+func (sptd SimpleProcessorTopicDefinition) transformHandler(sp *SimpleProcessor) PartitionHandler {
 	return func (p *Partition, msg DecodedKV) {
-		sptd.Handler(msg)
+		sptd.Handler(SimpleProcessorContext{
+			Topic: p.Topic,
+			TopicObject: sptd.Object,
+			Processor: sp,
+			ProcessorObject: sp.obj,
+		}, msg)
 	}
 }
 
@@ -18,6 +31,7 @@ type SimpleProcessor struct {
 	closeChan chan struct{}
 	pm *PartitionManager
 	runnable Runnable
+	obj interface{}
 	topics map[string]SimpleProcessorTopicDefinition
 }
 
@@ -28,9 +42,7 @@ func (sp *SimpleProcessor) handlePartitionCreation(p *Partition) {
 	}
 
 	p.SetCodec(topicDef.Codec)
-	p.SetHandler(func (p *Partition, msg DecodedKV) {
-		topicDef.Handler(msg)
-	})
+	p.SetHandler(topicDef.transformHandler(sp))
 	p.SetCommitBehavior(func (p *Partition, msg MessageEvent) {
 		sp.pm.consumer.Commit(p.Topic, p.Id, msg.Offset)
 	})
@@ -41,6 +53,10 @@ func (sp *SimpleProcessor) handlePartitionCreation(p *Partition) {
 
 func (sp *SimpleProcessor) handlePartitionRemoval(p *Partition) {
 	p.Close()
+}
+
+func (sp *SimpleProcessor) SetObject(obj interface{}) {
+	sp.obj = obj
 }
 
 func (sp *SimpleProcessor) Close() {
