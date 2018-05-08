@@ -14,7 +14,7 @@ func (tp *TopicProducer) Send(key string, msg interface{}) error {
 	}
 
 	err = tp.producer.Send(tp.Topic, encoded.Key, encoded.Value)
-	return nil
+	return err
 }
 
 func NewTopicProducer(topic string, codec Codec, producer Producer) *TopicProducer {

@@ -138,7 +138,7 @@ func (c *Consumer) Commit(topic string, partition int64, offset int64) {
 		kafka.TopicPartition{
 			Topic: c.topicsMap[topic],
 			Partition: int32(partition),
-			Offset: off,
+			Offset: 1 + off,
 		},
 	})
 }

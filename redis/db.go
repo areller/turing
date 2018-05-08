@@ -38,6 +38,7 @@ type DB interface {
 	RPop(key string) (string, bool)
 	LRange(key string, start int64, end int64) []string
 	Publish(key string, value interface{})
+	Expire(key string, expiry time.Duration)
 }
 
 type RDB struct {
@@ -147,6 +148,12 @@ func (rdb *RDB) IncreaseBy(key string, value float64) float64 {
 		return rdb.native.IncrByFloat(key, value).Result()
 	})
 	return res.(float64)
+}
+
+func (rdb *RDB) Expire(key string, expiry time.Duration) {
+	rdb.mustRun(key, "setex", func () (interface{}, error) {
+		return rdb.native.Expire(key, expiry).Result()
+	})
 }
 
 func NewDB(config RedisConfig) (*RDB, error) {
