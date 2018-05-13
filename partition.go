@@ -1,6 +1,6 @@
 package turing
 
-type PartitionHandler func (partition *Partition, message DecodedKV)
+type PartitionHandler func (partition *Partition, original EncodedKV, message DecodedKV)
 type PartitionCommitHandler func (partition *Partition, message MessageEvent)
 
 const (
@@ -32,7 +32,10 @@ func (p *Partition) handleMessageEvent(msg MessageEvent) {
 
 	decoded, err := p.codec.Decode(msg.Key, msg.Value)
 	if err == nil {
-		p.handler(p, decoded)
+		p.handler(p, EncodedKV{
+			Key: msg.Key,
+			Value: msg.Value,
+		}, decoded)
 	}
 }
 

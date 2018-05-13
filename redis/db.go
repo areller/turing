@@ -29,6 +29,7 @@ type DB interface {
 	HSet(key string, field string, value interface{})
 	HSetMany(key string, kv map[string]interface{})
 	LPush(key string, value interface{})
+	LTrim(key string, start int64, end int64)
 	RPush(key string, value interface{})
 	IncreaseBy(key string, value float64) float64
 	Get(key string) (string, bool)
@@ -110,6 +111,12 @@ func (rdb *RDB) LPush(key string, value interface{}) {
 	})
 }
 
+func (rdb *RDB) LTrim(key string, start int64, end int64) {
+	rdb.mustRun(key, "ltrim", func () (interface{}, error) {
+		return rdb.native.LTrim(key, start, end).Result()
+	})
+}
+
 func (rdb *RDB) RPush(key string, value interface{}) {
 	rdb.mustRun(key, "rpush", func () (interface{}, error) {
 		return rdb.native.RPush(key, value).Result()
@@ -169,10 +176,5 @@ func NewDB(config RedisConfig) (*RDB, error) {
 }
 
 func MustNewDB(config RedisConfig) *RDB {
-	redis, err := NewDB(config)
-	if err != nil {
-		panic(err)
-	}
-
-	return redis
+	return turing.MustGet(NewDB(config)).(*RDB)
 }

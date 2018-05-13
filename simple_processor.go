@@ -10,6 +10,7 @@ type SimpleProcessorContext struct {
 	Topic string
 	TopicObject interface{}
 	ProcessorObject interface{}
+	Encoded EncodedKV
 }
 
 type SimpleProcessorHandler func (context SimpleProcessorContext, msg DecodedKV)
@@ -22,12 +23,13 @@ type SimpleProcessorTopicDefinition struct {
 }
 
 func (sptd SimpleProcessorTopicDefinition) transformHandler(sp *SimpleProcessor) PartitionHandler {
-	return func (p *Partition, msg DecodedKV) {
+	return func (p *Partition, original EncodedKV, msg DecodedKV) {
 		sptd.Handler(SimpleProcessorContext{
 			Topic: p.Topic,
 			TopicObject: sptd.Object,
 			Processor: sp,
 			ProcessorObject: sp.obj,
+			Encoded: original,
 		}, msg)
 	}
 }

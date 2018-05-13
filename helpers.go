@@ -18,3 +18,17 @@ func tryWithTimeout(ts time.Duration, what func()) bool {
 		return true
 	}
 }
+
+func MustGet(val interface{}, err error) interface{} {
+	if err != nil {
+		panic(err)
+	}
+
+	return val
+}
+
+func Must(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
