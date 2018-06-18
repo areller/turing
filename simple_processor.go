@@ -1,5 +1,9 @@
 package turing
 
+import (
+	"strconv"
+)
+
 type partitionMessageTuple struct {
 	p *Partition
 	msg MessageEvent
@@ -41,6 +45,7 @@ type SimpleProcessor struct {
 	obj interface{}
 	topics map[string]SimpleProcessorTopicDefinition
 	commitBehavior func (p *Partition, msg MessageEvent)
+	offsetPickBehavior func (p *Partition) int64
 	commitChan chan partitionMessageTuple
 }
 
@@ -68,7 +73,7 @@ func (sp *SimpleProcessor) handlePartitionCreation(p *Partition) {
 			sp.commitBehavior(p, msg)
 		}
 	})
-	p.SetOffset(OffsetStored)
+	p.SetOffset(sp.offsetPickBehavior(p))
 
 	Log.WithFields(LogFields{
 		"topic": p.Topic,
@@ -118,6 +123,45 @@ func (sp *SimpleProcessor) SetAsyncCommitBehavior(behavior func (p *Partition, m
 func (sp *SimpleProcessor) SetAsyncDefaultCommitBehavior(consumer Consumer, buffer int) {
 	sp.commitBehavior = defaultCommitBehavior(consumer)
 	sp.commitChan = make(chan partitionMessageTuple, buffer)
+}
+
+func (sp *SimpleProcessor) SetKVStoreCommit(store KVStore) {
+	sp.commitBehavior = func (p *Partition, msg MessageEvent) {
+		store.HSet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10), msg.Offset)
+	}
+}
+
+func (sp *SimpleProcessor) SetAsyncKVStoreCommit(store KVStore, buffer int) {
+	sp.SetKVStoreCommit(store)
+	sp.commitChan = make(chan partitionMessageTuple, buffer)
+}
+
+func (sp *SimpleProcessor) SetOffsetPickBehavior(behavior func (p *Partition) int64) {
+	sp.offsetPickBehavior = behavior
+}
+
+func (sp *SimpleProcessor) SetKVStoreOffsetPick(store KVStore) {
+	sp.offsetPickBehavior = func (p *Partition) int64 {
+		off, err := store.HGet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10))
+		if err != nil {
+			return OffsetStored
+		}
+		offNum, err := strconv.ParseInt(off, 10, 64)
+		if err != nil {
+			return OffsetStored
+		}
+		return offNum
+	}
+}
+
+func (sp *SimpleProcessor) SetKVStoreBehavior(store KVStore) {
+	sp.SetKVStoreCommit(store)
+	sp.SetKVStoreOffsetPick(store)
+}
+
+func (sp *SimpleProcessor) SetAsyncKVStoreBehavior(store KVStore, buffer int) {
+	sp.SetAsyncKVStoreCommit(store, buffer)
+	sp.SetKVStoreOffsetPick(store)
 }
 
 func (sp *SimpleProcessor) Close() {
@@ -179,6 +223,12 @@ func defaultCommitBehavior(consumer Consumer) func (p *Partition, msg MessageEve
 	}
 }
 
+func defaultOffsetPickBehavior() func (p *Partition) int64 {
+	return func (p *Partition) int64 {
+		return OffsetStored
+	}
+}
+
 func NewSimpleProcessor(consumer Consumer, runnable Runnable, topics []SimpleProcessorTopicDefinition) (*SimpleProcessor, error) {
 	topicsMap, topicsNames, err := covertToTopicsMap(topics)
 	if err != nil {
@@ -194,5 +244,6 @@ func NewSimpleProcessor(consumer Consumer, runnable Runnable, topics []SimplePro
 		topics: topicsMap,
 		commitChan: nil,
 		commitBehavior: defaultCommitBehavior(consumer),
+		offsetPickBehavior: defaultOffsetPickBehavior(),
 	}, nil
 }

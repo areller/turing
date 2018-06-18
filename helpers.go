@@ -32,3 +32,7 @@ func Must(err error) {
 		panic(err)
 	}
 }
+
+func GetError(val interface{}, err error) error {
+	return err
+}
