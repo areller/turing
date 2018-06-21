@@ -30,6 +30,7 @@ func (p *Partition) handleMessageEvent(msg MessageEvent) {
 		}
 	}()
 
+	p.offset = msg.Offset
 	decoded, err := p.codec.Decode(msg.Key, msg.Value)
 	if err == nil {
 		p.handler(p, EncodedKV{
@@ -57,6 +58,10 @@ func (p *Partition) SetCommitBehavior(handler PartitionCommitHandler) {
 
 func (p *Partition) SetOffset(offset int64) {
 	p.offset = offset
+}
+
+func (p *Partition) GetOffset() int64 {
+	return p.offset
 }
 
 func (p *Partition) Run() error {

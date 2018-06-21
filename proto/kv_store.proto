@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package turing;
+option go_package = "github.com/areller/turing/proto";
+
+message StringRequest {
+    string key = 1;
+}
+
+message StringResponse {
+    string value = 1;
+}
+
+message HashFieldRequest {
+    string key = 1;
+    string field = 2;
+}
+
+message HashResponse {
+    map<string, string> value = 1;
+}
+
+service KVStore {
+    rpc Get(StringRequest) returns (StringResponse) {}
+    rpc HashGet(HashFieldRequest) returns (StringResponse) {}
+    rpc HashGetAll(StringRequest) returns (HashResponse) {}
+}

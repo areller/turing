@@ -14,12 +14,16 @@ func TestFailToDuplicateTopics(t *testing.T) {
 									  SimpleProcessorTopicDefinition{
 										  Name: "myTopicA",
 										  Codec: new(StringCodec),
-										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) {},
+										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
+											  return nil, true
+										  },
 									  },
 									  SimpleProcessorTopicDefinition{
 										  Name: "myTopicB",
 										  Codec: new(StringCodec),
-										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) {},
+										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
+											  return nil, true
+										  },
 									  },
 								  })
 
@@ -32,12 +36,16 @@ func TestFailToDuplicateTopics(t *testing.T) {
 									  SimpleProcessorTopicDefinition{
 										  Name: "myTopicA",
 										  Codec: new(StringCodec),
-										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) {},
+										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
+											  return nil, true
+										  },
 									  },
 									  SimpleProcessorTopicDefinition{
 										  Name: "myTopicA",
 										  Codec: new(StringCodec),
-										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) {},
+										  Handler: func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
+											  return nil, true
+										  },
 									  },
 								  })
 
@@ -54,12 +62,12 @@ func TestMessageProcessing(t *testing.T) {
 		1: "topicB",
 	}
 
-	handler := func (topic int) func (ctx SimpleProcessorContext, msg DecodedKV) {
-		return func (ctx SimpleProcessorContext, msg DecodedKV) {
+	handler := func (topic int) func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
+		return func (ctx SimpleProcessorContext, msg DecodedKV) (error, bool) {
 			assert.Equal(t, sp, ctx.Processor)
 			assert.Equal(t, topic, ctx.TopicObject.(int))
 			assert.Equal(t, "processorobject", ctx.ProcessorObject.(string))
-			assert.Equal(t, tMap[topic], ctx.Topic)
+			assert.Equal(t, tMap[topic], ctx.Partition.Topic)
 
 			switch topic {
 			case 0:
@@ -67,6 +75,8 @@ func TestMessageProcessing(t *testing.T) {
 			case 1:
 				chanB <- msg
 			}
+
+			return nil, true
 		}
 	}
 

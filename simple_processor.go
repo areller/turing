@@ -1,5 +1,10 @@
 package turing
 
+import (
+	"github.com/sirupsen/logrus"
+	"strconv"
+)
+
 type partitionMessageTuple struct {
 	p *Partition
 	msg MessageEvent
@@ -7,13 +12,13 @@ type partitionMessageTuple struct {
 
 type SimpleProcessorContext struct {
 	Processor *SimpleProcessor
-	Topic string
+	Partition *Partition
 	TopicObject interface{}
 	ProcessorObject interface{}
 	Encoded EncodedKV
 }
 
-type SimpleProcessorHandler func (context SimpleProcessorContext, msg DecodedKV)
+type SimpleProcessorHandler func (context SimpleProcessorContext, msg DecodedKV) (err error, moveOn bool)
 
 type SimpleProcessorTopicDefinition struct {
 	Name string
@@ -24,13 +29,37 @@ type SimpleProcessorTopicDefinition struct {
 
 func (sptd SimpleProcessorTopicDefinition) transformHandler(sp *SimpleProcessor) PartitionHandler {
 	return func (p *Partition, original EncodedKV, msg DecodedKV) {
-		sptd.Handler(SimpleProcessorContext{
-			Topic: p.Topic,
-			TopicObject: sptd.Object,
-			Processor: sp,
-			ProcessorObject: sp.obj,
-			Encoded: original,
-		}, msg)
+		for {
+			err, moveOn := sptd.Handler(SimpleProcessorContext{
+				Partition: p,
+				TopicObject: sptd.Object,
+				Processor: sp,
+				ProcessorObject: sp.obj,
+				Encoded: original,
+			}, msg)
+
+			if err == FatalError {
+				Log.WithError(err).WithFields(logrus.Fields{
+					"topic": p.Topic,
+					"partition": p.Id,
+					"offset": p.offset,
+				}).Panic("Exiting due to a fatal error")
+				return
+			} else {
+				if err != nil {
+					Log.WithError(err).WithFields(logrus.Fields{
+						"topic": p.Topic,
+						"partition": p.Id,
+						"offset": p.offset,
+						"moveOn": moveOn,
+					}).Error("Could not process message, handler returned a non-fatal error")
+				}
+
+				if moveOn {
+					break
+				}
+			}
+		}
 	}
 }
 
@@ -41,6 +70,7 @@ type SimpleProcessor struct {
 	obj interface{}
 	topics map[string]SimpleProcessorTopicDefinition
 	commitBehavior func (p *Partition, msg MessageEvent)
+	offsetPickBehavior func (p *Partition) int64
 	commitChan chan partitionMessageTuple
 }
 
@@ -68,7 +98,7 @@ func (sp *SimpleProcessor) handlePartitionCreation(p *Partition) {
 			sp.commitBehavior(p, msg)
 		}
 	})
-	p.SetOffset(OffsetStored)
+	p.SetOffset(sp.offsetPickBehavior(p))
 
 	Log.WithFields(LogFields{
 		"topic": p.Topic,
@@ -118,6 +148,53 @@ func (sp *SimpleProcessor) SetAsyncCommitBehavior(behavior func (p *Partition, m
 func (sp *SimpleProcessor) SetAsyncDefaultCommitBehavior(consumer Consumer, buffer int) {
 	sp.commitBehavior = defaultCommitBehavior(consumer)
 	sp.commitChan = make(chan partitionMessageTuple, buffer)
+}
+
+func (sp *SimpleProcessor) SetKVStoreCommit(store KVStore) {
+	sp.commitBehavior = func (p *Partition, msg MessageEvent) {
+		err := store.HSet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10), msg.Offset)
+		if err == ConnectionDroppedError || UnrecongnizableError(err) {
+			Log.WithError(err).Panic("Could not commit offset to key-value store")
+			return
+		}
+	}
+}
+
+func (sp *SimpleProcessor) SetAsyncKVStoreCommit(store KVStore, buffer int) {
+	sp.SetKVStoreCommit(store)
+	sp.commitChan = make(chan partitionMessageTuple, buffer)
+}
+
+func (sp *SimpleProcessor) SetOffsetPickBehavior(behavior func (p *Partition) int64) {
+	sp.offsetPickBehavior = behavior
+}
+
+func (sp *SimpleProcessor) SetKVStoreOffsetPick(store KVStore) {
+	sp.offsetPickBehavior = func (p *Partition) int64 {
+		off, err := store.HGet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10))
+		if err == KeyNotExistsError {
+			return OffsetStored
+		} else if err == ConnectionDroppedError || UnrecongnizableError(err) {
+			Log.WithError(err).Panic("Could not fetch offset from key-value store")
+			return OffsetNone
+		} else {
+			offNum, err := strconv.ParseInt(off, 10, 64)
+			if err != nil {
+				return OffsetStored
+			}
+			return offNum + 1
+		}
+	}
+}
+
+func (sp *SimpleProcessor) SetKVStoreBehavior(store KVStore) {
+	sp.SetKVStoreCommit(store)
+	sp.SetKVStoreOffsetPick(store)
+}
+
+func (sp *SimpleProcessor) SetAsyncKVStoreBehavior(store KVStore, buffer int) {
+	sp.SetAsyncKVStoreCommit(store, buffer)
+	sp.SetKVStoreOffsetPick(store)
 }
 
 func (sp *SimpleProcessor) Close() {
@@ -179,6 +256,12 @@ func defaultCommitBehavior(consumer Consumer) func (p *Partition, msg MessageEve
 	}
 }
 
+func defaultOffsetPickBehavior() func (p *Partition) int64 {
+	return func (p *Partition) int64 {
+		return OffsetStored
+	}
+}
+
 func NewSimpleProcessor(consumer Consumer, runnable Runnable, topics []SimpleProcessorTopicDefinition) (*SimpleProcessor, error) {
 	topicsMap, topicsNames, err := covertToTopicsMap(topics)
 	if err != nil {
@@ -194,5 +277,6 @@ func NewSimpleProcessor(consumer Consumer, runnable Runnable, topics []SimplePro
 		topics: topicsMap,
 		commitChan: nil,
 		commitBehavior: defaultCommitBehavior(consumer),
+		offsetPickBehavior: defaultOffsetPickBehavior(),
 	}, nil
 }

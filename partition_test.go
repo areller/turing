@@ -8,7 +8,7 @@ import (
 
 func TestReturnErrorIfNoCodecOrHandler(t *testing.T) {
 	part := NewPartition("myTopic", 0)
-	part.SetHandler(func (p *Partition, msg DecodedKV) {
+	part.SetHandler(func (p *Partition, original EncodedKV, msg DecodedKV) {
 
 	})
 
@@ -43,7 +43,7 @@ func TestReturnErrorIfNoCodecOrHandler(t *testing.T) {
 		;
 	}
 
-	part.SetHandler(func (p *Partition, msg DecodedKV) {
+	part.SetHandler(func (p *Partition, original EncodedKV, msg DecodedKV) {
 
 	})
 
@@ -63,9 +63,11 @@ func TestMessageDecoding(t *testing.T) {
 	part.SetCodec(new(StringCodec))
 
 	done := make(chan struct{})
-	part.SetHandler(func (p *Partition, msg DecodedKV) {
+	part.SetHandler(func (p *Partition, original EncodedKV, msg DecodedKV) {
 		assert.Equal(t, "myKey", msg.Key)
 		assert.Equal(t, "My Message", msg.Value)
+		assert.Equal(t, []byte("myKey"), original.Key)
+		assert.Equal(t, []byte("My Message"), original.Value)
 		close(done)
 	})
 
@@ -90,9 +92,11 @@ func TestCommitHandler(t *testing.T) {
 	part.SetCodec(new(StringCodec))
 
 	done := make(chan struct{})
-	part.SetHandler(func (p *Partition, msg DecodedKV) {
+	part.SetHandler(func (p *Partition, original EncodedKV, msg DecodedKV) {
 		assert.Equal(t, "myKey", msg.Key)
 		assert.Equal(t, "My Message", msg.Value)
+		assert.Equal(t, []byte("myKey"), original.Key)
+		assert.Equal(t, []byte("My Message"), original.Value)
 		close(done)
 	})
 
@@ -126,7 +130,7 @@ func TestPartitionAssign(t *testing.T) {
 	getOffset := func (cb func (p *Partition)) int64 {
 		part := NewPartition("myTopic", 0)
 		part.SetCodec(new(StringCodec))
-		part.SetHandler(func (p *Partition, msg DecodedKV) {
+		part.SetHandler(func (p *Partition, original EncodedKV, msg DecodedKV) {
 
 		})
 

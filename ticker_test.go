@@ -11,8 +11,9 @@ func TestTicking(t *testing.T) {
 	rChan := make(chan time.Time)
 	duration := 500 * time.Millisecond
 
-	tick := NewTicker(duration, func () {
+	tick := NewTicker(duration, nil, func (obj interface{}) (error, bool) {
 		rChan <- time.Now()
+		return nil, true
 	})
 
 	go tick.Run()
@@ -31,4 +32,22 @@ func TestTicking(t *testing.T) {
 	})
 
 	assert.False(t, res)
+}
+
+func TestTickerObject(t *testing.T) {
+	object := "AB"
+	ch := make(chan interface{})
+	tick := NewTicker(time.Millisecond, object, func (obj interface{}) (error, bool) {
+		ch <- obj
+		return nil, true
+	})
+
+	go tick.Run()
+	var matchingObject interface{}
+	res := tryWithTimeout(time.Second, func () {
+		matchingObject = <- ch
+	})
+
+	assert.True(t, res)
+	assert.Equal(t, object, matchingObject)
 }
