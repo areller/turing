@@ -150,9 +150,9 @@ func (sp *SimpleProcessor) SetAsyncDefaultCommitBehavior(consumer Consumer, buff
 	sp.commitChan = make(chan partitionMessageTuple, buffer)
 }
 
-func (sp *SimpleProcessor) SetKVStoreCommit(store KVStore) {
+func (sp *SimpleProcessor) SetKVStoreCommit(groupName string, store KVStore) {
 	sp.commitBehavior = func (p *Partition, msg MessageEvent) {
-		err := store.HSet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10), msg.Offset)
+		err := store.HSet("turing_" + p.Topic + "_" + groupName, strconv.FormatInt(p.Id, 10), msg.Offset)
 		if err == ConnectionDroppedError || UnrecongnizableError(err) {
 			Log.WithError(err).Panic("Could not commit offset to key-value store")
 			return
@@ -160,8 +160,8 @@ func (sp *SimpleProcessor) SetKVStoreCommit(store KVStore) {
 	}
 }
 
-func (sp *SimpleProcessor) SetAsyncKVStoreCommit(store KVStore, buffer int) {
-	sp.SetKVStoreCommit(store)
+func (sp *SimpleProcessor) SetAsyncKVStoreCommit(groupName string, store KVStore, buffer int) {
+	sp.SetKVStoreCommit(groupName, store)
 	sp.commitChan = make(chan partitionMessageTuple, buffer)
 }
 
@@ -169,9 +169,9 @@ func (sp *SimpleProcessor) SetOffsetPickBehavior(behavior func (p *Partition) in
 	sp.offsetPickBehavior = behavior
 }
 
-func (sp *SimpleProcessor) SetKVStoreOffsetPick(store KVStore) {
+func (sp *SimpleProcessor) SetKVStoreOffsetPick(groupName string, store KVStore) {
 	sp.offsetPickBehavior = func (p *Partition) int64 {
-		off, err := store.HGet("turing_" + p.Topic, strconv.FormatInt(p.Id, 10))
+		off, err := store.HGet("turing_" + p.Topic + "_" + groupName, strconv.FormatInt(p.Id, 10))
 		if err == KeyNotExistsError {
 			return OffsetStored
 		} else if err == ConnectionDroppedError || UnrecongnizableError(err) {
@@ -187,14 +187,14 @@ func (sp *SimpleProcessor) SetKVStoreOffsetPick(store KVStore) {
 	}
 }
 
-func (sp *SimpleProcessor) SetKVStoreBehavior(store KVStore) {
-	sp.SetKVStoreCommit(store)
-	sp.SetKVStoreOffsetPick(store)
+func (sp *SimpleProcessor) SetKVStoreBehavior(groupName string, store KVStore) {
+	sp.SetKVStoreCommit(groupName, store)
+	sp.SetKVStoreOffsetPick(groupName, store)
 }
 
-func (sp *SimpleProcessor) SetAsyncKVStoreBehavior(store KVStore, buffer int) {
-	sp.SetAsyncKVStoreCommit(store, buffer)
-	sp.SetKVStoreOffsetPick(store)
+func (sp *SimpleProcessor) SetAsyncKVStoreBehavior(groupName string, store KVStore, buffer int) {
+	sp.SetAsyncKVStoreCommit(groupName, store, buffer)
+	sp.SetKVStoreOffsetPick(groupName, store)
 }
 
 func (sp *SimpleProcessor) Close() {
