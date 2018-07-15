@@ -24,12 +24,6 @@ type Partition struct {
 }
 
 func (p *Partition) handleMessageEvent(msg MessageEvent) {
-	defer func() {
-		if p.commitHandler != nil {
-			p.commitHandler(p, msg)
-		}
-	}()
-
 	p.offset = msg.Offset
 	decoded, err := p.codec.Decode(msg.Key, msg.Value)
 	if err == nil {
@@ -37,6 +31,10 @@ func (p *Partition) handleMessageEvent(msg MessageEvent) {
 			Key: msg.Key,
 			Value: msg.Value,
 		}, decoded)
+
+		if p.commitHandler != nil {
+			p.commitHandler(p, msg)
+		}
 	}
 }
 

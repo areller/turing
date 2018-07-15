@@ -6,9 +6,10 @@ import (
 	"github.com/areller/turing/confluent"
 )
 
-func HandleTestMessages(msg turing.DecodedKV) {
+func HandleTestMessages(context turing.SimpleProcessorContext, msg turing.DecodedKV) (error, bool) {
 	val := msg.Value.(string)
 	fmt.Println("New Message %s: %s", msg.Key, val)
+	return nil, true
 }
 
 func main() {
