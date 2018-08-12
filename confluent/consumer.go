@@ -17,6 +17,7 @@ type ConsumerConfig struct {
 	Group string
 	AutoCommit bool
 	AutoCommitInterval int
+	LogConnectionClose bool
 }
 
 func ConsumerConfigFromTable(table turing.ConfigTable) ConsumerConfig {
@@ -25,6 +26,7 @@ func ConsumerConfigFromTable(table turing.ConfigTable) ConsumerConfig {
 		Group: table.GetString("kafka_group"),
 		AutoCommit: table.GetBool("kafka_auto_commit"),
 		AutoCommitInterval: table.GetInt("kafka_auto_commit_interval"),
+		LogConnectionClose: table.GetBool("kafka_log_connection_close"),
 	}
 }
 
@@ -180,6 +182,7 @@ func NewConsumer(config ConsumerConfig) *Consumer {
 		"enable.auto.commit": config.AutoCommit,
 		"auto.commit.interval.ms": config.AutoCommitInterval,
 		"go.application.rebalance.enable": true,
+		"log.connection.close": config.LogConnectionClose,
 		"default.topic.config":            kafka.ConfigMap{"auto.offset.reset": "earliest"},
 	})
 

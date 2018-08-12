@@ -16,6 +16,7 @@ func main() {
 	consumer := confluent.NewConsumer(confluent.ConsumerConfig{
 		Brokers: []string{"127.0.0.1:9092"},
 		Group: "sGroup",
+		LogConnectionClose: false,
 	})
 	simpleProcessor, _ := turing.NewSimpleProcessor(consumer,
 													consumer,

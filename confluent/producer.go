@@ -10,11 +10,13 @@ import (
 
 type ProducerConfig struct {
 	Brokers []string
+	LogConnectionClose bool
 }
 
 func ProducerConfigFromTable(table turing.ConfigTable) ProducerConfig {
 	return ProducerConfig{
 		Brokers: strings.Split(table.GetString("kafka_brokers"), ","),
+		LogConnectionClose: table.GetBool("kafka_log_connection_close"),
 	}
 }
 
@@ -74,6 +76,7 @@ func (p *Producer) Run() error {
 func NewProducer(config ProducerConfig) *Producer {
 	p, err := kafka.NewProducer(&kafka.ConfigMap{
 		"bootstrap.servers": strings.Join(config.Brokers, ","),
+		"log.connection.close": config.LogConnectionClose,
 	})
 
 	if err != nil {
